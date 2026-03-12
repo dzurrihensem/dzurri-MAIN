@@ -65,7 +65,10 @@ const Timetable: React.FC<TimetableProps> = ({ user, schedule, erphs, masterData
   }, []);
 
   const parseTime = (timeStr: string) => {
-    const [h, m] = timeStr.split(':').map(Number);
+    if (!timeStr || timeStr === 'Sepanjang masa hari persekolahan') return START_TIME;
+    const parts = timeStr.split(':').map(Number);
+    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return START_TIME;
+    const [h, m] = parts;
     return h + m / 60;
   };
 
@@ -105,8 +108,8 @@ const Timetable: React.FC<TimetableProps> = ({ user, schedule, erphs, masterData
     }
 
     return filtered.map(item => {
-      const start = parseTime(item.startTime);
-      const end = parseTime(item.endTime);
+      const start = item.startTime === 'Sepanjang masa hari persekolahan' ? START_TIME : parseTime(item.startTime);
+      const end = (!item.endTime || item.endTime === '') ? END_TIME : parseTime(item.endTime);
       const top = (start - START_TIME) * 2; // 2 slots per hour
       const height = (end - start) * 2;
       return { ...item, gridTop: top + 1, gridSpan: height };
@@ -116,7 +119,9 @@ const Timetable: React.FC<TimetableProps> = ({ user, schedule, erphs, masterData
   const stats = useMemo(() => {
     let totalHours = 0;
     generatedSchedule.forEach(slot => {
-      totalHours += parseTime(slot.endTime) - parseTime(slot.startTime);
+      const start = slot.startTime === 'Sepanjang masa hari persekolahan' ? START_TIME : parseTime(slot.startTime);
+      const end = (!slot.endTime || slot.endTime === '') ? END_TIME : parseTime(slot.endTime);
+      totalHours += end - start;
     });
     return {
       totalSlots: generatedSchedule.length,
@@ -169,7 +174,8 @@ const Timetable: React.FC<TimetableProps> = ({ user, schedule, erphs, masterData
               <span className={`text-[7px] md:text-[8px] font-black ${theme.text} uppercase tracking-widest truncate drop-shadow-sm`}>{slot.subject}</span>
               {!isWeekView && (
                 <span className={`text-[7px] md:text-[8px] font-bold ${theme.text} tabular-nums bg-black/10 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/20 w-fit shadow-sm`}>
-                  {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                  {formatTime(slot.startTime)}
+                  {slot.endTime ? ` - ${formatTime(slot.endTime)}` : ''}
                 </span>
               )}
             </div>
@@ -178,7 +184,8 @@ const Timetable: React.FC<TimetableProps> = ({ user, schedule, erphs, masterData
             </h3>
             {isWeekView && (
                <span className={`text-[7px] font-bold ${theme.text} tabular-nums opacity-80`}>
-                 {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                 {formatTime(slot.startTime)}
+                 {slot.endTime ? ` - ${formatTime(slot.endTime)}` : ''}
                </span>
             )}
           </div>
@@ -416,7 +423,8 @@ const Timetable: React.FC<TimetableProps> = ({ user, schedule, erphs, masterData
                         <div className="flex items-center justify-between">
                           <span className="text-[9px] font-bold text-slate-500 uppercase">{slot.className} {slot.classTitle}</span>
                           <span className="text-[8px] font-black text-slate-400 bg-white px-1.5 py-0.5 rounded shadow-sm border border-slate-100 tabular-nums">
-                            {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                            {formatTime(slot.startTime)}
+                            {slot.endTime ? ` - ${formatTime(slot.endTime)}` : ''}
                           </span>
                         </div>
                       </div>
