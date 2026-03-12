@@ -634,13 +634,40 @@ HANYA berikan JSON sahaja tanpa sebarang teks lain.`;
               </div>
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <label className={`text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2 ${isPendidikanIslam ? 'font-jawi text-lg flex-row-reverse' : ''}`}>
-                <Clock size={12} className="text-blue-600" /> {labels.timeSlot}
-              </label>
+              <div className="flex items-center justify-between">
+                <label className={`text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2 ${isPendidikanIslam ? 'font-jawi text-lg flex-row-reverse' : ''}`}>
+                  <Clock size={12} className="text-blue-600" /> {labels.timeSlot}
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    checked={formData.startTime === 'Sepanjang masa hari persekolahan'}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        handleFieldChange('startTime', 'Sepanjang masa hari persekolahan');
+                        handleFieldChange('endTime', '');
+                      } else {
+                        handleFieldChange('startTime', '08:00');
+                        handleFieldChange('endTime', '09:00');
+                      }
+                    }}
+                  />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Sepanjang masa hari persekolahan</span>
+                </label>
+              </div>
               <div className="flex items-center gap-2">
-                <input type="time" className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" value={formData.startTime} onChange={e => handleFieldChange('startTime', e.target.value)} />
-                <span className={`text-slate-300 font-black text-[10px] ${isPendidikanIslam ? 'font-jawi text-sm' : ''}`}>{labels.to}</span>
-                <input type="time" className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" value={formData.endTime} onChange={e => handleFieldChange('endTime', e.target.value)} />
+                {formData.startTime === 'Sepanjang masa hari persekolahan' ? (
+                  <div className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-500 text-center uppercase tracking-widest">
+                    Sepanjang masa hari persekolahan
+                  </div>
+                ) : (
+                  <>
+                    <input type="time" className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" value={formData.startTime} onChange={e => handleFieldChange('startTime', e.target.value)} />
+                    <span className={`text-slate-300 font-black text-[10px] ${isPendidikanIslam ? 'font-jawi text-sm' : ''}`}>{labels.to}</span>
+                    <input type="time" className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" value={formData.endTime} onChange={e => handleFieldChange('endTime', e.target.value)} />
+                  </>
+                )}
                 <div className="flex bg-slate-200/50 p-1 rounded-lg ml-2">
                   {LANGUAGES.map(l => (
                     <button key={l.value} type="button" onClick={() => handleFieldChange('language', l.value)} className={`px-3 py-1.5 rounded-md text-[9px] font-black transition-all ${formData.language === l.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
