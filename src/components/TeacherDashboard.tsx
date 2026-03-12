@@ -198,15 +198,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     const slotsMap = new Map<string, ScheduleSlot>();
     
     myErphs.forEach(e => {
-      if (!e.day || !e.startTime || !e.endTime || !e.subject) return;
-      const key = `${e.day.toUpperCase()}-${e.startTime}-${e.endTime}-${e.subject}-${e.className}-${e.classTitle}`;
+      if (!e.day || !e.startTime || !e.subject) return;
+      const key = `${e.day.toUpperCase()}-${e.startTime}-${e.endTime || ''}-${e.subject}-${e.className}-${e.classTitle}`;
       if (!slotsMap.has(key)) {
         slotsMap.set(key, {
           id: key,
           teacherId: user.id,
           day: e.day.toUpperCase(),
           startTime: e.startTime,
-          endTime: e.endTime,
+          endTime: e.endTime || '',
           subject: e.subject,
           className: e.className,
           classTitle: e.classTitle
@@ -440,8 +440,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         className="flex items-center gap-3 p-2.5 bg-white border border-slate-100 rounded-2xl hover:border-blue-300 hover:bg-blue-50/50 transition-all text-left group premium-shadow-sm" 
                         onClick={() => onSelectScheduleSlot?.(slot)}
                       >
-                        <div className="flex-none w-10 py-1 bg-slate-50 text-slate-500 rounded-lg text-[9px] font-bold tabular-nums text-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                          {slot.startTime}
+                        <div className="flex-none w-10 py-1 bg-slate-50 text-slate-500 rounded-lg text-[9px] font-bold tabular-nums text-center group-hover:bg-blue-600 group-hover:text-white transition-colors flex items-center justify-center">
+                          {slot.startTime === 'Sepanjang masa hari persekolahan' ? <span className="text-[7px] leading-tight">ALL<br/>DAY</span> : slot.startTime}
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="text-[10px] font-black text-slate-800 uppercase truncate leading-tight">{slot.subject}</h4>
