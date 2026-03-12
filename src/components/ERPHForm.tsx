@@ -32,10 +32,36 @@ const ERPHForm: React.FC<ERPHFormProps> = ({ user, onSave, onCancel, masterData,
     'Lain-lain (nyatakan)'
   ];
   
+  const parseInitialBbm = (bbmStr: string | undefined) => {
+    if (!bbmStr) return { bbm: 'Buku Teks', custom: '' };
+    const items = bbmStr.split(',').map(s => s.trim()).filter(Boolean);
+    const standardItems: string[] = [];
+    const customItems: string[] = [];
+    
+    items.forEach(item => {
+      if (bbmOptions.includes(item) && item !== 'Lain-lain (nyatakan)') {
+        standardItems.push(item);
+      } else if (item === 'Lain-lain (nyatakan)') {
+        standardItems.push(item);
+      } else {
+        customItems.push(item);
+      }
+    });
+
+    if (customItems.length > 0 && !standardItems.includes('Lain-lain (nyatakan)')) {
+      standardItems.push('Lain-lain (nyatakan)');
+    }
+
+    return {
+      bbm: standardItems.length > 0 ? standardItems.join(', ') : 'Buku Teks',
+      custom: customItems.join(', ')
+    };
+  };
+
   const [loading, setLoading] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
-    const isCustomBbm = initialData?.bbm && !bbmOptions.includes(initialData.bbm);
-  const [customBbm, setCustomBbm] = useState(isCustomBbm ? initialData.bbm : '');
+  const initialBbmParsed = parseInitialBbm(initialData?.bbm);
+  const [customBbm, setCustomBbm] = useState(initialBbmParsed.custom);
   const [showPreview, setShowPreview] = useState(false);
   
   const filledWeeks = useMemo(() => {
@@ -100,9 +126,8 @@ const ERPHForm: React.FC<ERPHFormProps> = ({ user, onSave, onCancel, masterData,
       combinedData.day = days[dateObj.getDay()];
     }
 
-    if (combinedData.bbm && !bbmOptions.includes(combinedData.bbm)) {
-      combinedData.bbm = 'Lain-lain (nyatakan)';
-    }
+    const parsedBbm = parseInitialBbm(combinedData.bbm);
+    combinedData.bbm = parsedBbm.bbm;
 
     return combinedData;
   });
@@ -164,25 +189,50 @@ const ERPHForm: React.FC<ERPHFormProps> = ({ user, onSave, onCancel, masterData,
   }, [formData.subject, formData.className, hierarchy]);
 
   useEffect(() => {
-    if (formData.subject && formData.className && formData.title && hierarchy[formData.subject]?.[formData.className]?.[formData.title]) {
-      setAvailableFields(Object.keys(hierarchy[formData.subject][formData.className][formData.title]).sort());
+    if (formData.subject && formData.className && formData.title) {
+      const titles = formData.title.split('; ').filter(t => t.trim() !== '');
+      const allFields = new Set<string>();
+      titles.forEach(title => {
+        const fieldsObj = hierarchy[formData.subject]?.[formData.className]?.[title];
+        if (fieldsObj) {
+          Object.keys(fieldsObj).forEach(f => allFields.add(f));
+        }
+      });
+      setAvailableFields(Array.from(allFields).sort());
     } else setAvailableFields([]);
   }, [formData.subject, formData.className, formData.title, hierarchy]);
 
   useEffect(() => {
-    if (formData.subject && formData.className && formData.title && formData.field && hierarchy[formData.subject]?.[formData.className]?.[formData.title]?.[formData.field]) {
-      setAvailableSKs(Object.keys(hierarchy[formData.subject][formData.className][formData.title][formData.field]).sort());
+    if (formData.subject && formData.className && formData.title && formData.field) {
+      const titles = formData.title.split('; ').filter(t => t.trim() !== '');
+      const fields = formData.field.split('; ').filter(f => f.trim() !== '');
+      const allSKs = new Set<string>();
+      titles.forEach(title => {
+        fields.forEach(field => {
+          const sksObj = hierarchy[formData.subject]?.[formData.className]?.[title]?.[field];
+          if (sksObj) {
+            Object.keys(sksObj).forEach(sk => allSKs.add(sk));
+          }
+        });
+      });
+      setAvailableSKs(Array.from(allSKs).sort());
     } else setAvailableSKs([]);
   }, [formData.subject, formData.className, formData.title, formData.field, hierarchy]);
 
   useEffect(() => {
     if (formData.subject && formData.className && formData.title && formData.field && selectedSKs.length > 0) {
+      const titles = formData.title.split('; ').filter(t => t.trim() !== '');
+      const fields = formData.field.split('; ').filter(f => f.trim() !== '');
       const allSPs = new Set<string>();
       selectedSKs.forEach(sk => {
-        const sps = hierarchy[formData.subject]?.[formData.className]?.[formData.title]?.[formData.field]?.[sk];
-        if (sps) {
-          Object.keys(sps).forEach(sp => allSPs.add(sp));
-        }
+        titles.forEach(title => {
+          fields.forEach(field => {
+            const sps = hierarchy[formData.subject]?.[formData.className]?.[title]?.[field]?.[sk];
+            if (sps) {
+              Object.keys(sps).forEach(sp => allSPs.add(sp));
+            }
+          });
+        });
       });
       setAvailableSPs(Array.from(allSPs).sort());
     } else {
@@ -203,11 +253,17 @@ const ERPHForm: React.FC<ERPHFormProps> = ({ user, onSave, onCancel, masterData,
 
   useEffect(() => {
     if (formData.subject && formData.className && formData.title && formData.field && selectedSKs.length > 0 && selectedSPs.length > 0) {
+      const titles = formData.title.split('; ').filter(t => t.trim() !== '');
+      const fields = formData.field.split('; ').filter(f => f.trim() !== '');
       const cores = new Set<string>();
       selectedSKs.forEach(sk => {
         selectedSPs.forEach(sp => {
-          const core = hierarchy[formData.subject]?.[formData.className]?.[formData.title]?.[formData.field]?.[sk]?.[sp];
-          if (core) cores.add(core);
+          titles.forEach(title => {
+            fields.forEach(field => {
+              const core = hierarchy[formData.subject]?.[formData.className]?.[title]?.[field]?.[sk]?.[sp];
+              if (core) cores.add(core);
+            });
+          });
         });
       });
       const uniqueCores = Array.from(cores).filter(c => c !== '');
@@ -254,11 +310,17 @@ const ERPHForm: React.FC<ERPHFormProps> = ({ user, onSave, onCancel, masterData,
     setFormData(prev => ({ ...prev, sk: newSKs.join('; ') }));
     
     const validSPs = new Set<string>();
+    const titles = (formData.title || '').split('; ').filter(t => t.trim() !== '');
+    const fields = (formData.field || '').split('; ').filter(f => f.trim() !== '');
     newSKs.forEach(k => {
-      const sps = hierarchy[formData.subject]?.[formData.className]?.[formData.title]?.[formData.field]?.[k];
-      if (sps) {
-        Object.keys(sps).forEach(sp => validSPs.add(sp));
-      }
+      titles.forEach(title => {
+        fields.forEach(field => {
+          const sps = hierarchy[formData.subject]?.[formData.className]?.[title]?.[field]?.[k];
+          if (sps) {
+            Object.keys(sps).forEach(sp => validSPs.add(sp));
+          }
+        });
+      });
     });
     
     const newSPs = selectedSPs.filter(sp => validSPs.has(sp));
@@ -393,7 +455,7 @@ Teks Rumi Untuk Ditukar:
 Objective: ${formData.objective}
 Activities: ${formData.activities}
 Reflection: ${formData.reflection}
-BBM: ${formData.bbm === 'Lain-lain (nyatakan)' ? customBbm : formData.bbm}
+BBM: ${(formData.bbm || '').split(',').map(s => s.trim()).map(item => item === 'Lain-lain (nyatakan)' ? customBbm : item).filter(Boolean).join(', ')}
 
 HANYA berikan JSON sahaja tanpa sebarang teks lain.`;
 
@@ -428,7 +490,8 @@ HANYA berikan JSON sahaja tanpa sebarang teks lain.`;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalBbmValue = formData.bbm === 'Lain-lain (nyatakan)' ? customBbm : (formData.bbm || '');
+    const bbmArray = (formData.bbm || '').split(',').map(s => s.trim()).filter(Boolean);
+    const finalBbmValue = bbmArray.map(item => item === 'Lain-lain (nyatakan)' ? customBbm : item).filter(Boolean).join(', ');
     const fullData: ERPHData = {
       id: formData.id || Math.random().toString(36).substr(2, 9),
       teacherId: user.id,
@@ -457,7 +520,8 @@ HANYA berikan JSON sahaja tanpa sebarang teks lain.`;
   };
 
   const handleSaveDraft = () => {
-    const finalBbmValue = formData.bbm === 'Lain-lain (nyatakan)' ? customBbm : (formData.bbm || '');
+    const bbmArray = (formData.bbm || '').split(',').map(s => s.trim()).filter(Boolean);
+    const finalBbmValue = bbmArray.map(item => item === 'Lain-lain (nyatakan)' ? customBbm : item).filter(Boolean).join(', ');
     const fullData: ERPHData = {
       id: formData.id || Math.random().toString(36).substr(2, 9),
       teacherId: user.id,
@@ -665,17 +729,85 @@ HANYA berikan JSON sahaja tanpa sebarang teks lain.`;
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div className="space-y-1.5">
                 <label className={`text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest flex items-center gap-2 ${isPendidikanIslam ? 'font-jawi text-lg flex-row-reverse' : ''}`}><Edit3 size={12}/> {labels.pdpTitle}</label>
-                <select className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" disabled={!formData.className} value={String(formData.title ?? '')} onChange={e => handleFieldChange('title', e.target.value)}>
-                  <option value="">Pilih Tajuk</option>
-                  {availableTitles.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+               <div className="space-y-2">
+                 <select 
+                   className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" 
+                   disabled={!formData.className} 
+                   value="" 
+                   onChange={e => {
+                     const val = e.target.value;
+                     if (!val) return;
+                     const current = (formData.title || '').split('; ').filter(Boolean);
+                     if (!current.includes(val)) {
+                       handleFieldChange('title', [...current, val].join('; '));
+                     }
+                   }}
+                 >
+                   <option value="">Pilih Tajuk (Boleh pilih lebih dari satu)</option>
+                   {availableTitles.map(t => <option key={t} value={t}>{t}</option>)}
+                 </select>
+                 
+                 {(formData.title || '').split('; ').filter(Boolean).length > 0 && (
+                   <div className="flex flex-wrap gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                     {(formData.title || '').split('; ').filter(Boolean).map(t => (
+                       <div key={t} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm animate-fadeIn">
+                         <span className="text-[10px] font-bold text-slate-700">{t}</span>
+                         <button 
+                           type="button" 
+                           onClick={() => {
+                             const current = (formData.title || '').split('; ').filter(Boolean);
+                             handleFieldChange('title', current.filter(item => item !== t).join('; '));
+                           }}
+                           className="text-slate-400 hover:text-red-500 transition-colors"
+                         >
+                           <X size={12} />
+                         </button>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+               </div>
                </div>
                <div className="space-y-1.5">
                 <label className={`text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest flex items-center gap-2 ${isPendidikanIslam ? 'font-jawi text-lg flex-row-reverse' : ''}`}><Layers size={12}/> {labels.field}</label>
-                <select className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" disabled={!formData.title} value={String(formData.field ?? '')} onChange={e => handleFieldChange('field', e.target.value)}>
-                  <option value="">Pilih Bidang</option>
-                  {availableFields.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
+               <div className="space-y-2">
+                 <select 
+                   className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" 
+                   disabled={!formData.title} 
+                   value="" 
+                   onChange={e => {
+                     const val = e.target.value;
+                     if (!val) return;
+                     const current = (formData.field || '').split('; ').filter(Boolean);
+                     if (!current.includes(val)) {
+                       handleFieldChange('field', [...current, val].join('; '));
+                     }
+                   }}
+                 >
+                   <option value="">Pilih Bidang (Boleh pilih lebih dari satu)</option>
+                   {availableFields.map(f => <option key={f} value={f}>{f}</option>)}
+                 </select>
+                 
+                 {(formData.field || '').split('; ').filter(Boolean).length > 0 && (
+                   <div className="flex flex-wrap gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                     {(formData.field || '').split('; ').filter(Boolean).map(f => (
+                       <div key={f} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm animate-fadeIn">
+                         <span className="text-[10px] font-bold text-slate-700">{f}</span>
+                         <button 
+                           type="button" 
+                           onClick={() => {
+                             const current = (formData.field || '').split('; ').filter(Boolean);
+                             handleFieldChange('field', current.filter(item => item !== f).join('; '));
+                           }}
+                           className="text-slate-400 hover:text-red-500 transition-colors"
+                         >
+                           <X size={12} />
+                         </button>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+               </div>
                </div>
             </div>
 
@@ -794,10 +926,42 @@ HANYA berikan JSON sahaja tanpa sebarang teks lain.`;
             <div className="space-y-1.5">
               <label className={`text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-2 ${isPendidikanIslam ? 'font-jawi text-lg flex-row-reverse' : ''}`}><Layers size={12}/> {labels.bbm}</label>
               <div className="space-y-2">
-                <select className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" value={String(formData.bbm ?? '')} onChange={e => handleFieldChange('bbm', e.target.value)}>
+                <select 
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl font-bold text-xs outline-none" 
+                  value="" 
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const current = (formData.bbm || '').split(',').map(s => s.trim()).filter(Boolean);
+                    if (!current.includes(val)) {
+                      handleFieldChange('bbm', [...current, val].join(', '));
+                    }
+                  }}
+                >
+                  <option value="">Pilih BBM (Boleh pilih lebih dari satu)</option>
                   {bbmOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
-                {formData.bbm === 'Lain-lain (nyatakan)' && (
+                
+                {(formData.bbm || '').split(',').map(s => s.trim()).filter(Boolean).length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                    {(formData.bbm || '').split(',').map(s => s.trim()).filter(Boolean).map(opt => (
+                      <div key={opt} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm animate-fadeIn">
+                        <span className="text-[10px] font-bold text-slate-700">{opt}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const current = (formData.bbm || '').split(',').map(s => s.trim()).filter(Boolean);
+                            handleFieldChange('bbm', current.filter(item => item !== opt).join(', '));
+                          }}
+                          className="text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {(formData.bbm || '').includes('Lain-lain (nyatakan)') && (
                   <input type="text" className={`w-full p-3 bg-blue-50/50 border border-blue-100 rounded-xl font-bold text-xs outline-none ${isJawiUI ? 'font-jawi text-xl' : ''}`} placeholder="Nyatakan BBM..." value={customBbm} onChange={e => setCustomBbm(e.target.value)} />
                 )}
               </div>
@@ -869,7 +1033,7 @@ HANYA berikan JSON sahaja tanpa sebarang teks lain.`;
 
       {showPreview && (
         <ERPHPreview 
-          erphs={[{ ...formData, bbm: formData.bbm === 'Lain-lain (nyatakan)' ? customBbm : (formData.bbm || '') } as ERPHData]} 
+          erphs={[{ ...formData, bbm: (formData.bbm || '').split(',').map(s => s.trim()).map(item => item === 'Lain-lain (nyatakan)' ? customBbm : item).filter(Boolean).join(', ') } as ERPHData]} 
           onBack={() => setShowPreview(false)} 
         />
       )}
