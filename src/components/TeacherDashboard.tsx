@@ -1,5 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import Papa from 'papaparse';
 import { UserProfile, ERPHData, ERPHStatus, WeeklyBundle, Resource, DskpLink, AppNotification, ScheduleSlot } from '../types';
 import { 
   Calendar, FileText, CheckCircle2, Clock, Plus, Pencil, Copy, Eye, FileDown, AlertCircle, SendHorizontal, Layers, ChevronRight, UserCheck, Filter, ChevronDown, 
@@ -59,6 +60,84 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [deletingErph, setDeletingErph] = useState<string | null>(null);
   const [shareSearch, setShareSearch] = useState('');
   const [rphSearch, setRphSearch] = useState('');
+  const [currentWeekInfo, setCurrentWeekInfo] = useState<{minggu: string, julat: string, penyemak: string, isSubmissionDay: boolean} | null>(null);
+
+  useEffect(() => {
+    const fetchWeekInfo = async () => {
+      try {
+        const response = await fetch('https://docs.google.com/spreadsheets/d/1rx8gxm2Xj64IDexhHRzwfg5dQEeHlGS_JL7J9XNm6Ag/export?format=csv&gid=0');
+        const csvText = await response.text();
+        
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const data = results.data as any[];
+            const now = new Date();
+            
+            const parseMalayDate = (dateStr: string) => {
+              if (!dateStr) return null;
+              const months: Record<string, number> = {
+                'JAN': 0, 'FEB': 1, 'MAC': 2, 'APRIL': 3, 'MEI': 4, 'JUN': 5,
+                'JULAI': 6, 'OGOS': 7, 'SEPT': 8, 'OKT': 9, 'NOV': 10, 'DIS': 11
+              };
+              const parts = dateStr.trim().split(' ');
+              if (parts.length >= 3) {
+                const day = parseInt(parts[0], 10);
+                const monthStr = parts[1].toUpperCase();
+                const year = parseInt(parts[2], 10);
+                const month = months[monthStr];
+                if (month !== undefined && !isNaN(day) && !isNaN(year)) {
+                  return new Date(year, month, day, 23, 59, 59);
+                }
+              }
+              return null;
+            };
+
+            let foundWeek = null;
+            let isSubmissionDay = false;
+            for (const row of data) {
+              const tarikh = row['Tarikh Penghantaran (Jumaat)'];
+              if (tarikh) {
+                const endDate = parseMalayDate(tarikh);
+                if (endDate && now <= endDate) {
+                  foundWeek = row;
+                  if (now.getFullYear() === endDate.getFullYear() && now.getMonth() === endDate.getMonth() && now.getDate() === endDate.getDate()) {
+                    isSubmissionDay = true;
+                  }
+                  break;
+                }
+              }
+            }
+            
+            if (!foundWeek && data.length > 0) {
+              foundWeek = data[data.length - 1]; 
+              const tarikh = foundWeek['Tarikh Penghantaran (Jumaat)'];
+              if (tarikh) {
+                const endDate = parseMalayDate(tarikh);
+                if (endDate && now.getFullYear() === endDate.getFullYear() && now.getMonth() === endDate.getMonth() && now.getDate() === endDate.getDate()) {
+                  isSubmissionDay = true;
+                }
+              }
+            }
+
+            if (foundWeek) {
+              setCurrentWeekInfo({
+                minggu: foundWeek['Minggu'] || '',
+                julat: foundWeek['Julat mingguan'] || '',
+                penyemak: foundWeek['Pegawai Penyemak'] || '',
+                isSubmissionDay
+              });
+            }
+          }
+        });
+      } catch (error) {
+        console.error("Error fetching week info:", error);
+      }
+    };
+
+    fetchWeekInfo();
+  }, []);
 
   const otherTeachers = useMemo(() => {
     return teachers.filter(t => t.id !== user.id && t.name.toLowerCase().includes(shareSearch.toLowerCase()));
@@ -171,6 +250,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
   return (
     <div className="space-y-8 md:space-y-16 animate-fadeIn text-left pb-24 md:pb-20">
+      {/* LED Signboard */}
+      {currentWeekInfo && (
+        <div className="overflow-hidden w-full relative flex items-center mb-2 px-1 text-[#dc5f26]">
+          <div className="animate-marquee text-sm md:text-base font-bold tracking-wide uppercase whitespace-nowrap">
+            Peringatan mesra: Minggu ini adalah {currentWeekInfo.minggu}, {currentWeekInfo.julat}. RPH anda akan disemak oleh {currentWeekInfo.penyemak}. Sila pastikan anda menyediakan RPH hari pertama pada minggu seterusnya.
+          </div>
+        </div>
+      )}
+      
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
         <div>
@@ -202,21 +290,32 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </h1>
           <p className="text-slate-400 font-bold mt-1 text-[9px] md:text-[10px] uppercase tracking-widest">Sekolah Seni Malaysia Johor • SMART Portal</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <button 
-            onClick={onSync} 
-            disabled={syncStatus === 'SYNCING'}
-            className={`flex items-center justify-center gap-3 bg-white border-2 border-slate-100 text-slate-600 px-6 md:px-8 py-4 md:py-6 rounded-2xl md:rounded-3xl font-black hover:bg-slate-50 transition-all active:scale-95 w-full md:w-auto ${syncStatus === 'SYNCING' ? 'opacity-70 cursor-not-allowed' : ''}`}
-          >
-            <Clock size={20} className={`md:w-6 md:h-6 text-blue-600 ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
-            <span className="uppercase text-[11px] md:text-xs tracking-widest">
-              {syncStatus === 'SYNCING' ? 'Sedang Kemaskini...' : 'Kemaskini'}
-            </span>
-          </button>
-          <button onClick={onAddNew} className="flex items-center justify-center gap-3 bg-slate-900 text-white px-6 md:px-10 py-4 md:py-6 rounded-2xl md:rounded-3xl font-black hover:bg-blue-600 shadow-xl transition-all active:scale-95 w-full md:w-auto">
-            <Plus size={20} className="md:w-6 md:h-6" />
-            <span className="uppercase text-[11px] md:text-xs tracking-widest">Bina RPH Baharu</span>
-          </button>
+        <div className="flex flex-col items-end gap-2 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <button 
+              onClick={onSync} 
+              disabled={syncStatus === 'SYNCING'}
+              className={`flex items-center justify-center gap-3 bg-white border-2 border-slate-100 text-slate-600 px-6 md:px-8 py-4 md:py-6 rounded-2xl md:rounded-3xl font-black hover:bg-slate-50 transition-all active:scale-95 w-full md:w-auto ${syncStatus === 'SYNCING' ? 'opacity-70 cursor-not-allowed' : ''}`}
+            >
+              <Clock size={20} className={`md:w-6 md:h-6 text-blue-600 ${syncStatus === 'SYNCING' ? 'animate-spin' : ''}`} />
+              <span className="uppercase text-[11px] md:text-xs tracking-widest">
+                {syncStatus === 'SYNCING' ? 'Sedang Kemaskini...' : 'Kemaskini'}
+              </span>
+            </button>
+            <button onClick={onAddNew} className="flex items-center justify-center gap-3 bg-[#0b41c7] text-white px-6 md:px-10 py-4 md:py-6 rounded-2xl md:rounded-3xl font-black hover:bg-blue-600 shadow-xl transition-all active:scale-95 w-full md:w-auto">
+              <Plus size={20} className="md:w-6 md:h-6" />
+              <span className="uppercase text-[11px] md:text-xs tracking-widest">Bina RPH Baharu</span>
+            </button>
+          </div>
+          {currentWeekInfo?.isSubmissionDay ? (
+            <div className="text-red-500 font-black text-[10px] md:text-xs animate-pulse w-full text-center md:text-right tracking-widest uppercase mt-1">
+              SILA HANTAR RPH MINGGUAN ANDA PADA HARI INI
+            </div>
+          ) : (
+            <div className="text-slate-400 font-bold text-[10px] md:text-xs w-full text-center md:text-right tracking-widest uppercase mt-1">
+              HARI INI: {new Date().toLocaleDateString('ms-MY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
+          )}
         </div>
       </div>
 
