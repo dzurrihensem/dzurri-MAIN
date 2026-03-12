@@ -165,7 +165,10 @@ const ERPHPreview: React.FC<ERPHPreviewProps> = ({ erphs, onBack, onSubmit, hide
                 <td className={`p-3 font-bold bg-slate-50 w-[15%] uppercase text-center text-slate-500 ${isPendidikanIslam ? 'font-jawi text-lg' : ''}`}>
                   {labels.time}
                 </td>
-                <td className="p-3 font-semibold uppercase text-slate-800">{formatTime(erph.startTime)} - {formatTime(erph.endTime)}</td>
+                <td className="p-3 font-semibold uppercase text-slate-800">
+                  {formatTime(erph.startTime)}
+                  {erph.endTime ? ` - ${formatTime(erph.endTime)}` : ''}
+                </td>
               </tr>
               <tr className="border-b border-slate-200">
                 <td className={`p-3 font-bold bg-slate-50 uppercase text-slate-500 ${isPendidikanIslam ? 'font-jawi text-lg' : ''}`}>
